@@ -1456,6 +1456,7 @@ button.btn-gold:hover {
 {"id":"BPP208","name":"润物无声","alias":"润物无声","type":"结界","cost":"3","keyword":"幻境","ability":"","img":"https://fishcrashers.oss-cn-chengdu.aliyuncs.com/YYSTCG/CARD/B_208.webp?v=3.2.1.0"},
 {"id":"BPP209","name":"引驾行","alias":"引驾行","type":"结界","cost":"4","keyword":"幻境","ability":"虫/追猎","img":"https://fishcrashers.oss-cn-chengdu.aliyuncs.com/YYSTCG/CARD/B_209.webp?v=3.2.2.0"},
 {"id":"BPP210","name":"灯火长明","alias":"灯火长明","type":"结界","cost":"5","keyword":"幻境","ability":"能量/横置/鬼火","img":"https://fishcrashers.oss-cn-chengdu.aliyuncs.com/YYSTCG/CARD/B_210.webp"},
+
     ];
 
     const B64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -1701,23 +1702,27 @@ function showDeckListPage() {
     renderDeckList();
 }
 
-// 你的原版 showMainApp，只加双层等待，其余完全不动
-function showMainApp() {
+// 你的原版 showMainApp，增加参数 resetState 控制是否重置抽卡
+function showMainApp(resetState = true) { // 【修改】默认重置，但允许传 false 阻止
     closeDeckDetail();
     document.getElementById('deckListPage').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
 
     toggleDrawBtn(true);
-    drawLeft = 20;
-    drawCount = {};
-    hasDrawn = false;
+    
+    // 【修改】只有在 resetState 为 true 时才重置抽卡状态
+    if (resetState) {
+        drawLeft = 20;
+        drawCount = {};
+        hasDrawn = false;
+    }
+    
     resetCardPreview();
 
     // ✅ 核心：等浏览器【真正渲染完DOM】，再执行renderCards
-    // 此时 cardLibrary 已显示 → 有宽度 → calculatePageSize 正常计算
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-            renderCards(); // render自带calculatePageSize，自动算对currentPageSize
+            renderCards();
         });
     });
 }
@@ -1804,24 +1809,27 @@ function editCurrentDeck() {
     const target = decks.find(d => d.id === currentEditingDeckId);
     if (!target) return;
     
-    // 1. ✅ 核心修复：重置所有搜索/筛选/代码
+    // 1. 重置所有搜索/筛选/代码
     resetDeckEditorUI();
     
-    // 2. 加载卡组数据（必生效）
+    // 2. 【核心修改】先切换页面，传入 false 告诉它不要重置抽卡数据
+    showMainApp(false); 
+    
+    // 3. 切换页面后，再加载卡组数据和抽卡状态
     deck = {...target.cards};
     hasDrawn = target.isOpen;
     currentEditingDeckId = target.id;
 
-    // 3. 切换页面 + 重置抽卡次数
-    showMainApp();
-    
-    // 4. ✅ 强制渲染卡组和卡牌（确保卡牌加载到列表）
+    // 【恢复抽卡状态】兼容旧数据：如果存档里没有，就给默认值
+    drawLeft = (target.drawLeft !== undefined && target.drawLeft !== null) ? target.drawLeft : 20;
+    drawCount = target.drawCount ? {...target.drawCount} : {};
+
+    // 4. 强制渲染
     renderDeck();
     renderCards();
     
     closeDeckDetail();
 }
-
     // 复制当前卡组短码
     function copyCurrentDeckCode() {
         const decks = getLocalDecks();
@@ -1874,6 +1882,9 @@ function editCurrentDeck() {
             if (index !== -1) {
                 decks[index].cards = {...deck};
                 decks[index].isOpen = hasDrawn;
+                // 【新增】保存抽卡状态
+                decks[index].drawLeft = drawLeft;
+                decks[index].drawCount = {...drawCount};
                 saveLocalDecks(decks);
                 alert('卡组更新成功！');
                 backToDeckList();
@@ -1889,7 +1900,10 @@ function editCurrentDeck() {
             id: generateDeckId(),
             name: hasDrawn ? '新卡组' : '【自由构筑】新卡组',
             isOpen: hasDrawn,
-            cards: {...deck}
+            cards: {...deck},
+            // 【新增】保存抽卡状态
+            drawLeft: drawLeft,
+            drawCount: {...drawCount}
         };
         decks.push(newDeck);
         saveLocalDecks(decks);
@@ -2090,18 +2104,18 @@ function renderDeck() {
     if(!list || !total) return;
     list.innerHTML = "";
     let sum=0;
-// 按类型排序：式神 > 觉醒 > 法术 > 附灵 > 结界，同类型按编号升序
-const typeOrder = { '式神': 1, '觉醒': 2, '法术': 3, '附灵': 4, '结界': 5 };
-const sortedEntries = Object.entries(deck).sort((a, b) => {
-  const cardA = ALL_CARDS.find(c => c.id === a[0]);
-  const cardB = ALL_CARDS.find(c => c.id === b[0]);
-  const typeA = cardA?.type || '';
-  const typeB = cardB?.type || '';
-  const ta = typeOrder[typeA] ?? 99;
-  const tb = typeOrder[typeB] ?? 99;
-  if (ta !== tb) return ta - tb;
-  return a[0].localeCompare(b[0]);
-});    
+    // 按类型排序：式神 > 觉醒 > 法术 > 附灵 > 结界，同类型按编号升序
+    const typeOrder = { '式神': 1, '觉醒': 2, '法术': 3, '附灵': 4, '结界': 5 };
+    const sortedEntries = Object.entries(deck).sort((a, b) => {
+      const cardA = ALL_CARDS.find(c => c.id === a[0]);
+      const cardB = ALL_CARDS.find(c => c.id === b[0]);
+      const typeA = cardA?.type || '';
+      const typeB = cardB?.type || '';
+      const ta = typeOrder[typeA] ?? 99;
+      const tb = typeOrder[typeB] ?? 99;
+      if (ta !== tb) return ta - tb;
+      return a[0].localeCompare(b[0]);
+    });    
     const typeColors = {
         "式神":"#c92a2a","觉醒":"#212529","法术":"#2f9e44","附灵":"#fd7e14","结界":"#9b30af"
     };
@@ -2117,6 +2131,14 @@ const sortedEntries = Object.entries(deck).sort((a, b) => {
         if(card && card.img){
             const grad = `linear-gradient(to right, transparent 0%, ${typeColors[type]||'#333'} 35%, ${typeColors[type]||'#333'} 100%)`;
             item.style.backgroundImage = `${grad}, url(${card.img})`;
+            
+            // 【新增】鼠标悬停时在预览区域显示卡牌图片
+            item.onmouseenter = () => {
+                if(previewBox) previewBox.style.backgroundImage = `url(${card.img})`;
+            };
+            item.onmouseleave = () => {
+                if(previewBox) previewBox.style.backgroundImage = `url(${DEFAULT_PREVIEW_IMG})`;
+            };
         }
 
         item.innerHTML=`
