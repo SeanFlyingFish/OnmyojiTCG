@@ -1456,7 +1456,6 @@ button.btn-gold:hover {
 {"id":"BPP208","name":"润物无声","alias":"润物无声","type":"结界","cost":"3","keyword":"幻境","ability":"","img":"https://fishcrashers.oss-cn-chengdu.aliyuncs.com/YYSTCG/CARD/B_208.webp?v=3.2.1.0"},
 {"id":"BPP209","name":"引驾行","alias":"引驾行","type":"结界","cost":"4","keyword":"幻境","ability":"虫/追猎","img":"https://fishcrashers.oss-cn-chengdu.aliyuncs.com/YYSTCG/CARD/B_209.webp?v=3.2.2.0"},
 {"id":"BPP210","name":"灯火长明","alias":"灯火长明","type":"结界","cost":"5","keyword":"幻境","ability":"能量/横置/鬼火","img":"https://fishcrashers.oss-cn-chengdu.aliyuncs.com/YYSTCG/CARD/B_210.webp"},
-
     ];
 
     const B64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -1486,7 +1485,7 @@ button.btn-gold:hover {
 
     // 新增：本地卡组存储配置
     const STORAGE_KEY = "YYSTCG_DECKS";
-    const MAX_DECKS = 27;
+    const MAX_DECKS = 30;
     let currentEditingDeckId = null; // 当前编辑的卡组ID
 
     const previewBox = document.getElementById('cardPreview');
@@ -1659,11 +1658,111 @@ function calculatePageSize() {
 
 
     // -------------------------- 新增：本地卡组核心函数 --------------------------
-    // 获取本地所有卡组
-    function getLocalDecks() {
-        const data = localStorage.getItem(STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
+// 获取本地所有卡组（固定9套预组 + 玩家卡组，永远不重复）
+function getLocalDecks() {
+    // 只读取玩家自己保存的卡组（不包含预组）
+    const userData = localStorage.getItem(STORAGE_KEY);
+    const userDecks = userData ? JSON.parse(userData) : [];
+
+    // ======================
+    // 固定 9 套独立预组（只在这里定义，不会重复生成）
+    // ======================
+    const presetDecks = [
+        {
+            id: "PRESET_DECK_1",
+            name: "【预组套牌】天邪鬼",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/D0YsD0oUD038D1HkD1XLD1XxETosET4UEVGaEVGtEVHBEVlsEbNDEbNfEbsSEb78EfHEEhECEhTsEkPM"
+        },
+        {
+            id: "PRESET_DECK_2",
+            name: "【预组套牌】大江山",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/EOBUEOQ8EOghEOg/EOwgEPPaEPfBEPvbEPvHEP+mEQN6EQdhEcrSEhTsEmb0HwVsH+f8H+vkH+/MIGzMIIRQ"
+        },
+        {
+            id: "PRESET_DECK_3",
+            name: "【预组套牌】跳跳家族",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/EGskEG8MEHL0EHbcEHrEEIZ6EUnMEU2yEVlrEatzEhECEiCiEkPLH7kcH8DqH8TUIHScIRirIWbK"
+        },
+        {
+            id: "PRESET_DECK_4",
+            name: "【预组套牌】青蛙瓷器",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/ES50EWkLEZQEEZfsEfHDEhy6Hr9EHsMEHsbqHsrUHs68IHC0IJusIJ+SINJcIVNEIZHCIaFi"
+        },
+        {
+            id: "PRESET_DECK_5",
+            name: "【预组套牌】青灯凤火",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/D208D3E4EEviEEwAEMT8EMjiEMkAES50Eat0EdKEEdZsEgFkEgk0EjBEEjgSIJfEIM50IXpS"
+        },
+        {
+            id: "PRESET_DECK_6",
+            name: "【预组套牌】雪女眩晕",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/EEQSEEQ6EEf8EF9sEGNSEGNmEI5gEJYcEV1UEZQEEdpUEeYMEgVMEjQqEjQ0IHCzIHSbIOH8Ia0a"
+        },
+        {
+            id: "PRESET_DECK_7",
+            name: "【预组套牌】怨灵快攻",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/EOQ8EVlrEbNCEbNgEfHEHpQkHzg0HzwaHzw4H0AEH0PsH0fUH0u8IHCzIIBSIN4UIPGcIU9c"
+        },
+        {
+            id: "PRESET_DECK_8",
+            name: "【预组套牌】岿岩屏障",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/EAWmEAl8EA1iEBU0EBkuECjOECy3EDCJEDRyEF9sES50EYhLEaOjEhEDEhTsEiCjHp/6H8TUIMqLIRyT"
+        },
+        {
+            id: "PRESET_DECK_9",
+            name: "【预组套牌】运势整活",
+            isOpen: false,
+            isPreset: true,
+            deckCode: "*OT/D206D3EiD3UKEBU0EMT8EMkKES50EWkMEcLiEd47HwVsH2MrH2cUH27iILcEINosISB8ITfsITvS"
+        }
+    ];
+
+    // 解析短码函数
+    function parseDeckCode(deckCode) {
+        try {
+            let b64data = deckCode.substring(CODE_HEAD.length);
+            let decodedStr = b64Decode(b64data);
+            let tempCards = {};
+            for (let i = 0; i < decodedStr.length; i += 7) {
+                let segment = decodedStr.substring(i, i + 7);
+                let cardCode = segment.substring(0, 6);
+                let count = parseInt(segment[6]) || 1;
+                let cardId = decodeCard(cardCode);
+                if (!cardId) continue;
+                tempCards[cardId] = (tempCards[cardId] || 0) + count;
+            }
+            return tempCards;
+        } catch (e) {
+            return {};
+        }
     }
+
+    // 给预组填充卡牌
+    presetDecks.forEach(deck => {
+        deck.cards = parseDeckCode(deck.deckCode);
+        deck.drawLeft = 20;
+        deck.drawCount = {};
+    });
+
+    // 最终显示：9套预组 + 玩家卡组（不会重复）
+    return [...presetDecks, ...userDecks];
+}
     // 保存卡组到本地
     function saveLocalDecks(decks) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
@@ -1672,15 +1771,27 @@ function calculatePageSize() {
     function generateDeckId() {
         return 'deck_' + Date.now() + Math.random().toString(36).substr(2, 5);
     }
-    // 渲染卡组列表
-    function renderDeckList() {
-        const decks = getLocalDecks();
-        const grid = document.getElementById('deckGrid');
-        grid.innerHTML = '';
-        decks.forEach(deck => {
-            const total = Object.values(deck.cards).reduce((a,b)=>a+b,0);
-            const cardEl = document.createElement('div');
-            cardEl.className = 'deck-card';
+// 渲染卡组列表
+function renderDeckList() {
+    const decks = getLocalDecks();
+    const grid = document.getElementById('deckGrid');
+    grid.innerHTML = '';
+    decks.forEach(deck => {
+        const total = Object.values(deck.cards).reduce((a,b)=>a+b,0);
+        const cardEl = document.createElement('div');
+        cardEl.className = 'deck-card';
+        
+        if (deck.isPreset) {
+            // 【修改】预组套牌：只显示【查看】按钮
+            cardEl.innerHTML = `
+                <div class="deck-card-name">${deck.name}</div>
+                <div class="deck-card-count">卡牌数量：${total}/60</div>
+                <div class="deck-card-actions">
+                    <button onclick="viewDeck('${deck.id}')">查看</button>
+                </div>
+            `;
+        } else {
+            // 用户套牌：正常操作
             cardEl.innerHTML = `
                 <div class="deck-card-name">${deck.name}</div>
                 <div class="deck-card-count">卡牌数量：${total}/60</div>
@@ -1690,10 +1801,11 @@ function calculatePageSize() {
                     <button class="danger" onclick="deleteDeck('${deck.id}')">删除</button>
                 </div>
             `;
-            grid.appendChild(cardEl);
-        });
-    }
-// 切换页面：显示卡组列表
+        }
+        
+        grid.appendChild(cardEl);
+    });
+}// 切换页面：显示卡组列表
 function showDeckListPage() {
     document.getElementById('deckListPage').style.display = 'block';
     document.getElementById('mainApp').style.display = 'none';
@@ -1846,52 +1958,55 @@ function editCurrentDeck() {
         copyToClipboard(finalCode, "短码");
         alert('卡组短码已复制！');
     }
-    // 重命名卡组（自由构筑前缀锁定）
-    function renameDeck(deckId) {
-        const decks = getLocalDecks();
-        const target = decks.find(d => d.id === deckId);
-        if (!target) return;
-        // 未抽牌 → 锁定【自由构筑】前缀
-        const prefix = target.isOpen ? '' : '【自由构筑】';
-        const oldName = target.name.replace(prefix, '');
-        const newName = prompt('请输入卡组名称：', oldName);
-        if (!newName) return;
-        target.name = prefix + newName;
-        saveLocalDecks(decks);
-        renderDeckList();
+// 重命名卡组
+function renameDeck(deckId) {
+    const decks = getLocalDecks();
+    const target = decks.find(d => d.id === deckId);
+    if (!target) return;
+    if (target.isPreset) {
+        alert("预组套牌不可重命名！");
+        return;
     }
-    // 删除卡组
-    function deleteDeck(deckId) {
-        if (!confirm('确定删除该卡组？')) return;
-        let decks = getLocalDecks();
-        decks = decks.filter(d => d.id !== deckId);
-        saveLocalDecks(decks);
-        renderDeckList();
+    const prefix = target.isOpen ? '' : '【自由构筑】';
+    const oldName = target.name.replace(prefix, '');
+    const newName = prompt('请输入卡组名称：', oldName);
+    if (!newName) return;
+    let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const idx = userDecks.findIndex(d => d.id === deckId);
+    if (idx !== -1) {
+        userDecks[idx].name = prefix + newName;
+        saveLocalDecks(userDecks);
     }
-    // 保存当前卡组到本地
-    function saveCurrentDeck() {
-        const total = Object.values(deck).reduce((a,b)=>a+b,0);
-        if (total === 0) {
-            alert('卡组不能为空！');
-            return;
-        }
-        const decks = getLocalDecks();
-        // 编辑模式：更新卡组
-        if (currentEditingDeckId) {
-            const index = decks.findIndex(d => d.id === currentEditingDeckId);
-            if (index !== -1) {
-                decks[index].cards = {...deck};
-                decks[index].isOpen = hasDrawn;
-                // 【新增】保存抽卡状态
-                decks[index].drawLeft = drawLeft;
-                decks[index].drawCount = {...drawCount};
-                saveLocalDecks(decks);
-                alert('卡组更新成功！');
-                backToDeckList();
-                return;
-            }
-        }
-        // 新建模式：新增卡组
+    renderDeckList();
+}
+// 删除卡组
+function deleteDeck(deckId) {
+    const decks = getLocalDecks();
+    const target = decks.find(d => d.id === deckId);
+    if (target?.isPreset) {
+        alert("预组套牌不可删除！");
+        return;
+    }
+    if (!confirm('确定删除该卡组？')) return;
+    let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    userDecks = userDecks.filter(d => d.id !== deckId);
+    saveLocalDecks(userDecks);
+    renderDeckList();
+}
+// 保存当前卡组到本地
+function saveCurrentDeck() {
+    const total = Object.values(deck).reduce((a,b)=>a+b,0);
+    if (total === 0) {
+        alert('卡组不能为空！');
+        return;
+    }
+    
+    // 【新增】判断当前编辑的是不是预组套牌
+    const decks = getLocalDecks();
+    const isEditingPreset = currentEditingDeckId && currentEditingDeckId.startsWith('PRESET_DECK_');
+
+    // 【修改】如果是预组套牌，强制另存为新卡组
+    if (isEditingPreset) {
         if (decks.length >= MAX_DECKS) {
             alert(`最多只能保存${MAX_DECKS}套卡组！`);
             return;
@@ -1901,15 +2016,53 @@ function editCurrentDeck() {
             name: hasDrawn ? '新卡组' : '【自由构筑】新卡组',
             isOpen: hasDrawn,
             cards: {...deck},
-            // 【新增】保存抽卡状态
             drawLeft: drawLeft,
             drawCount: {...drawCount}
         };
-        decks.push(newDeck);
-        saveLocalDecks(decks);
-        alert('卡组保存成功！');
+        // 只读取玩家自己的卡组（不包含预组）来保存
+        let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        userDecks.push(newDeck);
+        saveLocalDecks(userDecks);
+        alert('已另存为新卡组！');
         backToDeckList();
+        return;
     }
+
+    // 编辑模式：更新卡组（只针对用户自己的卡组）
+    if (currentEditingDeckId) {
+        let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        const index = userDecks.findIndex(d => d.id === currentEditingDeckId);
+        if (index !== -1) {
+            userDecks[index].cards = {...deck};
+            userDecks[index].isOpen = hasDrawn;
+            userDecks[index].drawLeft = drawLeft;
+            userDecks[index].drawCount = {...drawCount};
+            saveLocalDecks(userDecks);
+            alert('卡组更新成功！');
+            backToDeckList();
+            return;
+        }
+    }
+    
+    // 新建模式：新增卡组
+    if (decks.length >= MAX_DECKS) {
+        alert(`最多只能保存${MAX_DECKS}套卡组！`);
+        return;
+    }
+    const newDeck = {
+        id: generateDeckId(),
+        name: hasDrawn ? '新卡组' : '【自由构筑】新卡组',
+        isOpen: hasDrawn,
+        cards: {...deck},
+        drawLeft: drawLeft,
+        drawCount: {...drawCount}
+    };
+    let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    userDecks.push(newDeck);
+    saveLocalDecks(userDecks);
+    alert('卡组保存成功！');
+    backToDeckList();
+}
     // 返回卡组列表
 function backToDeckList() {
     // 退出组卡器时也重置，下次进入更干净
