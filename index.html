@@ -788,6 +788,178 @@ button.btn-gold:hover {
         max-width: 12px;
     }
 }
+/* 卡组卡片 - 主容器 */
+.deck-card {
+    background: #fffbf5;
+    border: 1px solid #e6d5c3;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(139, 69, 19, 0.15);
+    cursor: pointer;
+    transition: 0.2s;
+    overflow: visible;
+    position: relative;
+    margin-bottom: 15px;
+}
+.deck-card:hover {
+    transform: scale(1.02);
+    border-color: #d4a574;
+}
+
+/* 上半部分：封面卡 + 信息 */
+.deck-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    margin-bottom: -15px;
+}
+
+/* 封面卡容器 - 关键：让它上移，露出1/3 */
+.deck-cover {
+    flex-shrink: 0;
+    width: 100px;
+    height: 140px;
+    border-radius: 8px;
+    overflow: visible;
+    background: transparent;
+    cursor: pointer;
+    border: none;
+    transform: translateY(-25%);
+    transition: 0.2s;
+}
+.deck-cover:hover {
+    border-color: #d4a574;
+    transform: translateY(-25%) scale(1.05);
+}
+.deck-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 右侧信息区域 */
+.deck-card-info {
+    flex: 1;
+    padding-top: 10px;
+}
+/* 修正字号，和原图匹配 */
+.deck-card-name {
+    font-size: 18px; /* 从24px调小 */
+    font-weight: bold;
+    color: #5a3921;
+    margin-bottom: 8px;
+    word-break: break-all;
+}
+.deck-card-count {
+    color: #7a5230;
+    font-size: 16px; /* 从22px调小 */
+    margin-bottom: 0;
+}
+
+/* 下半部分：三个按钮在一行，拉满 */
+.deck-card-actions {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+.deck-card-actions button {
+    flex: 1;
+    padding: 12px 8px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+}
+.deck-card-actions button:nth-child(1),
+.deck-card-actions button:nth-child(2) {
+    background: linear-gradient(135deg, #9b30af, #7a248a);
+    color: white;
+}
+.deck-card-actions button:nth-child(3) {
+    background: linear-gradient(135deg, #c92a2a, #a02525);
+    color: white;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .deck-cover {
+        width: 80px;
+        height: 112px;
+        transform: translateY(-20%);
+    }
+    .deck-card-name {
+        font-size: 18px;
+    }
+    .deck-card-count {
+        font-size: 16px;
+    }
+    .deck-card-actions button {
+        font-size: 14px;
+        padding: 10px 8px;
+    }
+}
+
+/* 封面选择弹窗 */
+.cover-select-modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.cover-select-modal.show {
+    display: flex;
+}
+.cover-select-box {
+    background: #fffbf5;
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    border-radius: 12px;
+    padding: 20px;
+    overflow-y: auto;
+}
+.cover-select-title {
+    font-size: 20px;
+    color: #5a3921;
+    margin-bottom: 15px;
+    text-align: center;
+}
+.cover-select-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+}
+.cover-select-item {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.cover-select-item:hover {
+    border-color: #d4a574;
+    transform: scale(1.05);
+}
+.cover-select-item.selected {
+    border-color: #9b30af;
+    box-shadow: 0 0 10px rgba(155, 48, 175, 0.6);
+}
+.cover-select-item img {
+    width: 100%;
+    aspect-ratio: 378/528;
+    object-fit: cover;
+}
+.cover-select-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
     </style>
 </head>
 <body>
@@ -1495,6 +1667,80 @@ button.btn-gold:hover {
     const RARE_TYPES = ['UR', 'SP', 'OR', 'PC', 'EX', '3D'];
 
     let cardPrefixGroups = {};
+
+// 全局变量：当前正在选择封面的卡组ID
+let currentCoverDeckId = null;
+let selectedCoverCardId = null;
+
+// 打开封面选择弹窗
+function openCoverSelectModal(deckId) {
+    const decks = getLocalDecks();
+    const deck = decks.find(d => d.id === deckId);
+    if (!deck) return;
+    // 预组套牌不允许修改封面（可选，如果你想让预组也能改，就去掉这个判断）
+    if (deck.isPreset) {
+        alert("预组套牌的封面不可修改！");
+        return;
+    }
+
+    currentCoverDeckId = deckId;
+    selectedCoverCardId = deck.coverCardId || null;
+
+    const grid = document.getElementById('coverSelectGrid');
+    grid.innerHTML = '';
+
+    // 获取卡组里的所有卡牌（去重）
+    const uniqueCardIds = Object.keys(deck.cards);
+    uniqueCardIds.forEach(cardId => {
+        const card = ALL_CARDS.find(c => c.id === cardId);
+        if (!card) return;
+
+        const item = document.createElement('div');
+        item.className = 'cover-select-item';
+        if (cardId === selectedCoverCardId) {
+            item.classList.add('selected');
+        }
+        item.innerHTML = `<img src="${card.img}" alt="${card.name}">`;
+        item.onclick = () => {
+            // 清除其他选中
+            document.querySelectorAll('.cover-select-item').forEach(el => el.classList.remove('selected'));
+            item.classList.add('selected');
+            selectedCoverCardId = cardId;
+        };
+        grid.appendChild(item);
+    });
+
+    document.getElementById('coverSelectModal').classList.add('show');
+}
+
+// 关闭封面选择弹窗
+function closeCoverSelectModal() {
+    document.getElementById('coverSelectModal').classList.remove('show');
+    currentCoverDeckId = null;
+    selectedCoverCardId = null;
+}
+
+// 确认选择封面卡并保存
+function confirmCoverSelect() {
+    if (!currentCoverDeckId || !selectedCoverCardId) {
+        alert("请选择一张卡牌作为封面！");
+        return;
+    }
+
+    // 只修改用户卡组
+    let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const deckIndex = userDecks.findIndex(d => d.id === currentCoverDeckId);
+    if (deckIndex === -1) return;
+
+    // 保存封面卡ID
+    userDecks[deckIndex].coverCardId = selectedCoverCardId;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userDecks));
+
+    alert("封面卡已更新！");
+    closeCoverSelectModal();
+    renderDeckList(); // 刷新卡组列表
+}
+
     function initPrefixGroups() {
         cardPrefixGroups = {};
         for (let c of ALL_CARDS) {
@@ -1673,63 +1919,72 @@ function getLocalDecks() {
             name: "【预组套牌】天邪鬼",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/D0YsD0oUD038D1HkD1XLD1XxETosET4UEVGaEVGtEVHBEVlsEbNDEbNfEbsSEb78EfHEEhECEhTsEkPM"
+            deckCode: "*OT/D0YsD0oUD038D1HkD1XLD1XxETosET4UEVGaEVGtEVHBEVlsEbNDEbNfEbsSEb78EfHEEhECEhTsEkPM",
+            coverCardId: "AYK005-PC" 
         },
         {
             id: "PRESET_DECK_2",
             name: "【预组套牌】大江山",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/EOBUEOQ8EOghEOg/EOwgEPPaEPfBEPvbEPvHEP+mEQN6EQdhEcrSEhTsEmb0HwVsH+f8H+vkH+/MIGzMIIRQ"
+            deckCode: "*OT/EOBUEOQ8EOghEOg/EOwgEPPaEPfBEPvbEPvHEP+mEQN6EQdhEcrSEhTsEmb0HwVsH+f8H+vkH+/MIGzMIIRQ",
+            coverCardId: "AYK108-3D" 
         },
         {
             id: "PRESET_DECK_3",
             name: "【预组套牌】跳跳家族",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/EGskEG8MEHL0EHbcEHrEEIZ6EUnMEU2yEVlrEatzEhECEiCiEkPLH7kcH8DqH8TUIHScIRirIWbK"
+            deckCode: "*OT/EGskEG8MEHL0EHbcEHrEEIZ6EUnMEU2yEVlrEatzEhECEiCiEkPLH7kcH8DqH8TUIHScIRirIWbK",
+            coverCardId: "AYK077" 
         },
         {
             id: "PRESET_DECK_4",
             name: "【预组套牌】青蛙瓷器",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/ES50EWkLEZQEEZfsEfHDEhy6Hr9EHsMEHsbqHsrUHs68IHC0IJusIJ+SINJcIVNEIZHCIaFi"
+            deckCode: "*OT/ES50EWkLEZQEEZfsEfHDEhy6Hr9EHsMEHsbqHsrUHs68IHC0IJusIJ+SINJcIVNEIZHCIaFi",
+            coverCardId: "BPP016" 
         },
         {
             id: "PRESET_DECK_5",
             name: "【预组套牌】青灯凤火",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/D208D3E4EEviEEwAEMT8EMjiEMkAES50Eat0EdKEEdZsEgFkEgk0EjBEEjgSIJfEIM50IXpS"
+            deckCode: "*OT/D208D3E4EEviEEwAEMT8EMjiEMkAES50Eat0EdKEEdZsEgFkEgk0EjBEEjgSIJfEIM50IXpS",
+            coverCardId: "AYK100-UR" 
         },
         {
             id: "PRESET_DECK_6",
             name: "【预组套牌】雪女眩晕",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/EEQSEEQ6EEf8EF9sEGNSEGNmEI5gEJYcEV1UEZQEEdpUEeYMEgVMEjQqEjQ0IHCzIHSbIOH8Ia0a"
+            deckCode: "*OT/EEQSEEQ6EEf8EF9sEGNSEGNmEI5gEJYcEV1UEZQEEdpUEeYMEgVMEjQqEjQ0IHCzIHSbIOH8Ia0a",
+            coverCardId: "AYK181" 
         },
         {
             id: "PRESET_DECK_7",
             name: "【预组套牌】怨灵快攻",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/EOQ8EVlrEbNCEbNgEfHEHpQkHzg0HzwaHzw4H0AEH0PsH0fUH0u8IHCzIIBSIN4UIPGcIU9c"
+            deckCode: "*OT/EOQ8EVlrEbNCEbNgEfHEHpQkHzg0HzwaHzw4H0AEH0PsH0fUH0u8IHCzIIBSIN4UIPGcIU9c",
+            coverCardId: "BPP047-UR" 
         },
         {
             id: "PRESET_DECK_8",
             name: "【预组套牌】岿岩屏障",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/EAWmEAl8EA1iEBU0EBkuECjOECy3EDCJEDRyEF9sES50EYhLEaOjEhEDEhTsEiCjHp/6H8TUIMqLIRyT"
+            deckCode: "*OT/EAWmEAl8EA1iEBU0EBkuECjOECy3EDCJEDRyEF9sES50EYhLEaOjEhEDEhTsEiCjHp/6H8TUIMqLIRyT",
+            coverCardId: "AYK059-OR" 
         },
         {
             id: "PRESET_DECK_9",
             name: "【预组套牌】运势整活",
             isOpen: false,
             isPreset: true,
-            deckCode: "*OT/D206D3EiD3UKEBU0EMT8EMkKES50EWkMEcLiEd47HwVsH2MrH2cUH27iILcEINosISB8ITfsITvS"
+            deckCode: "*OT/D206D3EiD3UKEBU0EMT8EMkKES50EWkMEcLiEd47HwVsH2MrH2cUH27iILcEINosISB8ITfsITvS",
+            coverCardId: "BPP177" 
         }
     ];
 
@@ -1771,30 +2026,53 @@ function getLocalDecks() {
     function generateDeckId() {
         return 'deck_' + Date.now() + Math.random().toString(36).substr(2, 5);
     }
-// 渲染卡组列表
+// 渲染卡组列表（适配你要的布局）
 function renderDeckList() {
     const decks = getLocalDecks();
     const grid = document.getElementById('deckGrid');
     grid.innerHTML = '';
     decks.forEach(deck => {
         const total = Object.values(deck.cards).reduce((a,b)=>a+b,0);
+        // 获取封面卡ID（优先用用户选的，否则用卡组第一张）
+        let coverCardId = deck.coverCardId || null;
+        if (!coverCardId) {
+            const sortedIds = Object.keys(deck.cards).sort();
+            coverCardId = sortedIds[0] || null;
+        }
+        const coverCard = ALL_CARDS.find(c => c.id === coverCardId);
+        const coverImg = coverCard ? coverCard.img : DEFAULT_PREVIEW_IMG;
+
         const cardEl = document.createElement('div');
         cardEl.className = 'deck-card';
         
         if (deck.isPreset) {
-            // 【修改】预组套牌：只显示【查看】按钮
+            // 预组套牌：只显示【查看】按钮（但布局和用户卡组一致，按钮占满）
             cardEl.innerHTML = `
-                <div class="deck-card-name">${deck.name}</div>
-                <div class="deck-card-count">卡牌数量：${total}/60</div>
+                <div class="deck-card-header">
+                    <div class="deck-cover" onclick="openCoverSelectModal('${deck.id}')">
+                        <img src="${coverImg}" alt="封面卡">
+                    </div>
+                    <div class="deck-card-info">
+                        <div class="deck-card-name">${deck.name}</div>
+                        <div class="deck-card-count">卡牌数量：${total}/60</div>
+                    </div>
+                </div>
                 <div class="deck-card-actions">
                     <button onclick="viewDeck('${deck.id}')">查看</button>
                 </div>
             `;
         } else {
-            // 用户套牌：正常操作
+            // 用户套牌：三个按钮，一行拉满
             cardEl.innerHTML = `
-                <div class="deck-card-name">${deck.name}</div>
-                <div class="deck-card-count">卡牌数量：${total}/60</div>
+                <div class="deck-card-header">
+                    <div class="deck-cover" onclick="openCoverSelectModal('${deck.id}')">
+                        <img src="${coverImg}" alt="封面卡">
+                    </div>
+                    <div class="deck-card-info">
+                        <div class="deck-card-name">${deck.name}</div>
+                        <div class="deck-card-count">卡牌数量：${total}/60</div>
+                    </div>
+                </div>
                 <div class="deck-card-actions">
                     <button onclick="viewDeck('${deck.id}')">查看</button>
                     <button onclick="renameDeck('${deck.id}')">重命名</button>
@@ -1805,7 +2083,9 @@ function renderDeckList() {
         
         grid.appendChild(cardEl);
     });
-}// 切换页面：显示卡组列表
+}
+
+// 切换页面：显示卡组列表
 function showDeckListPage() {
     document.getElementById('deckListPage').style.display = 'block';
     document.getElementById('mainApp').style.display = 'none';
@@ -1993,76 +2273,82 @@ function deleteDeck(deckId) {
     saveLocalDecks(userDecks);
     renderDeckList();
 }
-// 保存当前卡组到本地
+// 保存当前卡组到本地（加入封面卡）
 function saveCurrentDeck() {
     const total = Object.values(deck).reduce((a,b)=>a+b,0);
     if (total === 0) {
         alert('卡组不能为空！');
         return;
     }
-    
-    // 【新增】判断当前编辑的是不是预组套牌
-    const decks = getLocalDecks();
-    const isEditingPreset = currentEditingDeckId && currentEditingDeckId.startsWith('PRESET_DECK_');
 
-    // 【修改】如果是预组套牌，强制另存为新卡组
-    if (isEditingPreset) {
-        if (decks.length >= MAX_DECKS) {
+    // 【新增】核心判断：如果当前编辑的是预组套牌，强制另存为新卡组
+    if (currentEditingDeckId && currentEditingDeckId.startsWith('PRESET_DECK_')) {
+        const userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        if (userDecks.length >= MAX_DECKS) {
             alert(`最多只能保存${MAX_DECKS}套卡组！`);
             return;
         }
+        // 默认封面卡为卡组第一张
+        const sortedIds = Object.keys(deck).sort();
+        const defaultCover = sortedIds[0] || null;
         const newDeck = {
             id: generateDeckId(),
             name: hasDrawn ? '新卡组' : '【自由构筑】新卡组',
             isOpen: hasDrawn,
             cards: {...deck},
             drawLeft: drawLeft,
-            drawCount: {...drawCount}
+            drawCount: {...drawCount},
+            coverCardId: defaultCover // 新增封面卡字段
         };
-        // 只读取玩家自己的卡组（不包含预组）来保存
-        let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
         userDecks.push(newDeck);
-        saveLocalDecks(userDecks);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(userDecks));
         alert('已另存为新卡组！');
         backToDeckList();
         return;
     }
 
-    // 编辑模式：更新卡组（只针对用户自己的卡组）
+    // --------------------------
+    // 以下完全是你原来的代码，只增加封面卡保存
+    // --------------------------
+    const decks = getLocalDecks();
+    // 编辑模式：更新卡组
     if (currentEditingDeckId) {
-        let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-        const index = userDecks.findIndex(d => d.id === currentEditingDeckId);
+        const index = decks.findIndex(d => d.id === currentEditingDeckId);
         if (index !== -1) {
-            userDecks[index].cards = {...deck};
-            userDecks[index].isOpen = hasDrawn;
-            userDecks[index].drawLeft = drawLeft;
-            userDecks[index].drawCount = {...drawCount};
-            saveLocalDecks(userDecks);
+            decks[index].cards = {...deck};
+            decks[index].isOpen = hasDrawn;
+            decks[index].drawLeft = drawLeft;
+            decks[index].drawCount = {...drawCount};
+            // 新增：更新封面卡（如果卡组为空，清空封面；否则用当前第一张）
+            const sortedIds = Object.keys(deck).sort();
+            decks[index].coverCardId = sortedIds[0] || null;
+            saveLocalDecks(decks);
             alert('卡组更新成功！');
             backToDeckList();
             return;
         }
     }
-    
     // 新建模式：新增卡组
     if (decks.length >= MAX_DECKS) {
         alert(`最多只能保存${MAX_DECKS}套卡组！`);
         return;
     }
+    const sortedIds = Object.keys(deck).sort();
     const newDeck = {
         id: generateDeckId(),
         name: hasDrawn ? '新卡组' : '【自由构筑】新卡组',
         isOpen: hasDrawn,
         cards: {...deck},
         drawLeft: drawLeft,
-        drawCount: {...drawCount}
+        drawCount: {...drawCount},
+        coverCardId: sortedIds[0] || null // 新增封面卡字段
     };
-    let userDecks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    userDecks.push(newDeck);
-    saveLocalDecks(userDecks);
+    decks.push(newDeck);
+    saveLocalDecks(decks);
     alert('卡组保存成功！');
     backToDeckList();
 }
+
     // 返回卡组列表
 function backToDeckList() {
     // 退出组卡器时也重置，下次进入更干净
@@ -2877,5 +3163,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
     </script>
+
+<!-- 封面卡选择弹窗 -->
+<div class="cover-select-modal" id="coverSelectModal">
+    <div class="cover-select-box">
+        <div class="cover-select-title">选择封面卡</div>
+        <div class="cover-select-grid" id="coverSelectGrid"></div>
+        <div class="cover-select-actions">
+            <button onclick="confirmCoverSelect()">确定</button>
+            <button onclick="closeCoverSelectModal()">取消</button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>
